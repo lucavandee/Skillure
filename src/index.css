@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply text-midnight scroll-smooth antialiased;
+  }
+
+  body {
+    @apply bg-lightgray-500 font-lato text-base;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-montserrat;
+  }
+
+  h1 {
+    @apply text-4xl font-bold md:text-5xl lg:text-6xl;
+  }
+
+  h2 {
+    @apply text-3xl font-bold md:text-4xl;
+  }
+
+  h3 {
+    @apply text-2xl font-semibold md:text-3xl;
+  }
+
+  h4 {
+    @apply text-xl font-semibold md:text-2xl;
+  }
+
+  p {
+    @apply leading-relaxed;
+  }
+
+  /* Enhanced focus styles for WCAG AA compliance */
+  :focus {
+    @apply outline-none ring-2 ring-turquoise-500 ring-offset-2;
+  }
+
+  /* High contrast focus for better accessibility */
+  :focus-visible {
+    @apply outline-none ring-2 ring-turquoise-500 ring-offset-2 ring-offset-white;
+  }
+
+  /* Ensure sufficient contrast for all text */
+  .text-gray-600 {
+    @apply text-gray-700;
+  }
+
+  .text-gray-500 {
+    @apply text-gray-600;
+  }
+}
+
+@layer components {
+  .container-custom {
+    @apply container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center py-2.5 px-5 font-medium rounded-lg transition-all duration-300 shadow-button disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply bg-turquoise-500 text-midnight hover:bg-turquoise-600 active:bg-turquoise-700 focus:ring-turquoise-500;
+  }
+
+  .btn-secondary {
+    @apply bg-midnight text-white hover:bg-midnight-200 active:bg-midnight-300 focus:ring-midnight;
+  }
+
+  .btn-outline {
+    @apply bg-transparent text-midnight border-2 border-midnight hover:bg-midnight hover:text-white focus:ring-midnight;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-midnight hover:bg-lightgray-700 shadow-none focus:ring-midnight;
+  }
+
+  .card {
+    @apply bg-white p-6 rounded-xl shadow-card transition-shadow duration-300 hover:shadow-hover;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-lg border border-lightgray-800 bg-white focus:outline-none focus:ring-2 focus:ring-turquoise-400 focus:border-transparent transition-all duration-300;
+  }
+
+  .nav-link {
+    @apply px-4 py-2 font-medium text-midnight hover:text-turquoise-500 transition-colors duration-300;
+  }
+
+  .nav-link-active {
+    @apply text-turquoise-500;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-turquoise-100 text-turquoise-900;
+  }
+
+  .badge-secondary {
+    @apply bg-midnight-100 text-white;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-error {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .match-score {
+    @apply flex items-center justify-center rounded-full text-lg font-bold;
+  }
+
+  .section-padding {
+    @apply py-10 md:py-20;
+  }
+}
+
+/* Smooth scrolling for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-lightgray-500;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-turquoise-300 rounded-full hover:bg-turquoise-400;
+}
+
+/* Loading animation */
+.loading-dots:after {
+  content: '.';
+  animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60% { content: '...'; }
+  80%, 100% { content: ''; }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn-primary {
+    @apply border-2 border-midnight;
+  }
+  
+  .btn-outline {
+    @apply border-4;
+  }
+  
+  :focus {
+    @apply ring-4 ring-midnight;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    @apply text-black bg-white;
+  }
+  
+  .card {
+    @apply shadow-none border border-gray-300;
+  }
+}

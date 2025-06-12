@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: skillure_db
+      POSTGRES_USER: skillure_user
+      POSTGRES_PASSWORD: skillure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillure_user -d skillure_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://skillure_user:skillure_password@db:5432/skillure_db
+      SECRET_KEY: your-super-secret-key-change-in-production
+      ENVIRONMENT: development
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
