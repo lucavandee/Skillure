@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { MapPin, Calendar } from 'lucide-react';
+import { MapPin, Calendar, FileText } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
+import Button from '../ui/Button';
 import { Candidate } from '../../types';
 import { mockCandidates } from '../../lib/mock-data';
+import { getStoredCandidates } from '../../lib/candidate-store';
+import { openCvInNewTab } from '../../lib/cv-viewer';
 
 const columns = [
   { id: 'nieuw', title: 'Nieuw' },
@@ -16,8 +19,23 @@ const columns = [
   { id: 'geplaatst', title: 'Geplaatst' }
 ];
 
+const mergeCandidates = (): Candidate[] => [
+  ...getStoredCandidates(),
+  ...mockCandidates,
+];
+
 const PipelineBoard: React.FC = () => {
-  const [candidates, setCandidates] = useState(mockCandidates);
+  const [candidates, setCandidates] = useState<Candidate[]>(() => mergeCandidates());
+
+  useEffect(() => {
+    const refresh = () => setCandidates(mergeCandidates());
+    window.addEventListener('skillure:candidates-updated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('skillure:candidates-updated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -104,6 +122,23 @@ const PipelineBoard: React.FC = () => {
                                     {new Date(candidate.date).toLocaleDateString('nl-NL')}
                                   </div>
                                 </div>
+                                {candidate.cvDataUrl && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    leftIcon={<FileText size={14} />}
+                                    className="mt-3"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openCvInNewTab(
+                                        candidate.cvDataUrl!,
+                                        candidate.cvFileName
+                                      );
+                                    }}
+                                  >
+                                    Bekijk CV
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </Card>

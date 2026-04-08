@@ -27,6 +27,8 @@ export interface Candidate {
     verified: boolean;
     certificates: string[];
   };
+  cvDataUrl?: string;
+  cvFileName?: string;
 }
 
 export interface FilterOptions {

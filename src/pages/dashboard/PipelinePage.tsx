@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Download, Tag, Plus, X, MessageSquare, FileText } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
+import { Candidate } from '../../types';
 import { mockCandidates } from '../../lib/mock-data';
+import { getStoredCandidates } from '../../lib/candidate-store';
+import { openCvInNewTab } from '../../lib/cv-viewer';
 
 interface Note {
   id: string;
@@ -18,15 +21,46 @@ interface CandidateWithPipeline extends Candidate {
   tags: string[];
 }
 
+const buildInitialPipeline = (): CandidateWithPipeline[] => {
+  const stored = getStoredCandidates();
+  const combined = [...stored, ...mockCandidates];
+  return combined.map((candidate) => ({
+    ...candidate,
+    status: Math.random() > 0.5 ? 'new' : 'matched',
+    notes: [],
+    tags: [],
+  }));
+};
+
 const PipelinePage: React.FC = () => {
-  const [candidates, setCandidates] = useState<CandidateWithPipeline[]>(
-    mockCandidates.map(candidate => ({
-      ...candidate,
-      status: Math.random() > 0.5 ? 'new' : 'matched',
-      notes: [],
-      tags: [],
-    }))
+  const [candidates, setCandidates] = useState<CandidateWithPipeline[]>(() =>
+    buildInitialPipeline()
   );
+
+  useEffect(() => {
+    const refresh = () => {
+      setCandidates((current) => {
+        const existingIds = new Set(current.map((c) => c.id));
+        const newCandidates = getStoredCandidates().filter(
+          (c) => !existingIds.has(c.id)
+        );
+        if (newCandidates.length === 0) return current;
+        const added: CandidateWithPipeline[] = newCandidates.map((c) => ({
+          ...c,
+          status: 'new',
+          notes: [],
+          tags: [],
+        }));
+        return [...added, ...current];
+      });
+    };
+    window.addEventListener('skillure:candidates-updated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('skillure:candidates-updated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   const [newNote, setNewNote] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -204,10 +238,27 @@ const PipelinePage: React.FC = () => {
                         )}
 
                         {candidate.notes.length > 0 && (
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-500 mb-2">
                             <MessageSquare size={14} className="inline mr-1" />
                             {candidate.notes.length} notitie(s)
                           </div>
+                        )}
+
+                        {candidate.cvDataUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<FileText size={14} />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openCvInNewTab(
+                                candidate.cvDataUrl!,
+                                candidate.cvFileName
+                              );
+                            }}
+                          >
+                            Bekijk CV
+                          </Button>
                         )}
                       </Card>
                     </motion.div>
@@ -250,6 +301,37 @@ const PipelinePage: React.FC = () => {
                     <X size={24} />
                   </button>
                 </div>
+
+                {/* CV Section */}
+                {selectedCandidate.cvDataUrl && (
+                  <div className="mb-6">
+                    <h3 className="font-bold mb-3 flex items-center">
+                      <FileText size={18} className="mr-2" />
+                      CV
+                    </h3>
+                    <div className="flex items-center justify-between bg-lightgray-500 rounded-lg px-4 py-3">
+                      <div className="flex items-center min-w-0">
+                        <FileText size={20} className="text-turquoise-700 flex-shrink-0" />
+                        <span className="ml-3 text-sm text-gray-700 truncate">
+                          {selectedCandidate.cvFileName ?? 'CV-bestand'}
+                        </span>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        leftIcon={<FileText size={14} />}
+                        onClick={() =>
+                          openCvInNewTab(
+                            selectedCandidate.cvDataUrl!,
+                            selectedCandidate.cvFileName
+                          )
+                        }
+                      >
+                        Bekijk CV
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Tags Section */}
                 <div className="mb-6">

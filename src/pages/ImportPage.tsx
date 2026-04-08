@@ -1,9 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, ArrowRight, Download, UserPlus } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, ArrowRight, Download, UserPlus, FileText, X } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
+import { Candidate } from '../types';
+import {
+  addStoredCandidate,
+  generateCandidateId,
+  readFileAsDataUrl,
+  MAX_CV_SIZE_BYTES,
+  ALLOWED_CV_TYPES,
+  ALLOWED_CV_EXTENSIONS,
+} from '../lib/candidate-store';
 
 interface MappingField {
   sourceField: string;
@@ -80,7 +89,9 @@ const ImportPage: React.FC = () => {
   const [manualVacancy, setManualVacancy] = useState<ManualVacancyData>(emptyVacancy);
   const [manualErrors, setManualErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [cvFile, setCvFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cvInputRef = useRef<HTMLInputElement>(null);
 
   const targetFields = {
     kandidaten: [
@@ -167,11 +178,57 @@ const ImportPage: React.FC = () => {
     setManualCandidate(emptyCandidate);
     setManualVacancy(emptyVacancy);
     setManualErrors({});
+    setCvFile(null);
+    if (cvInputRef.current) cvInputRef.current.value = '';
   };
 
   const switchMode = (mode: InputMode) => {
     setInputMode(mode);
     setManualErrors({});
+  };
+
+  const handleCvChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    if (!selected) {
+      setCvFile(null);
+      return;
+    }
+
+    const isAllowedType =
+      ALLOWED_CV_TYPES.includes(selected.type) ||
+      /\.(pdf|docx?|jpe?g|png)$/i.test(selected.name);
+
+    if (!isAllowedType) {
+      setManualErrors((prev) => ({
+        ...prev,
+        cv: 'Alleen PDF, Word of afbeeldingen (JPG/PNG) zijn toegestaan',
+      }));
+      event.target.value = '';
+      setCvFile(null);
+      return;
+    }
+
+    if (selected.size > MAX_CV_SIZE_BYTES) {
+      setManualErrors((prev) => ({
+        ...prev,
+        cv: `Bestand is te groot (max. ${Math.round(MAX_CV_SIZE_BYTES / 1024 / 1024)}MB)`,
+      }));
+      event.target.value = '';
+      setCvFile(null);
+      return;
+    }
+
+    setManualErrors((prev) => {
+      const next = { ...prev };
+      delete next.cv;
+      return next;
+    });
+    setCvFile(selected);
+  };
+
+  const clearCvFile = () => {
+    setCvFile(null);
+    if (cvInputRef.current) cvInputRef.current.value = '';
   };
 
   const handleCandidateChange = (
@@ -240,7 +297,7 @@ const ImportPage: React.FC = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const saveManualEntry = () => {
+  const saveManualEntry = async () => {
     const isValid =
       importType === 'kandidaten'
         ? validateManualCandidate()
@@ -249,12 +306,77 @@ const ImportPage: React.FC = () => {
     if (!isValid) return;
 
     setIsSaving(true);
-    // Simulate save (same pattern as importData)
-    setTimeout(() => {
+
+    try {
+      if (importType === 'kandidaten') {
+        let cvDataUrl: string | undefined;
+        let cvFileName: string | undefined;
+
+        if (cvFile) {
+          try {
+            cvDataUrl = await readFileAsDataUrl(cvFile);
+            cvFileName = cvFile.name;
+          } catch {
+            setManualErrors((prev) => ({
+              ...prev,
+              cv: 'Kon het CV-bestand niet lezen',
+            }));
+            setIsSaving(false);
+            return;
+          }
+        }
+
+        const skills = manualCandidate.skills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const languages = manualCandidate.languages
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        const newCandidate: Candidate = {
+          id: generateCandidateId(),
+          name: manualCandidate.naam.trim(),
+          role: manualCandidate.functie.trim(),
+          location: manualCandidate.locatie.trim() || '-',
+          status: 'nieuw',
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(manualCandidate.naam.trim())}&background=89CFF0&color=0D1B2A`,
+          date: new Date().toISOString().slice(0, 10),
+          skills,
+          experience: manualCandidate.ervaring.trim() || undefined,
+          availability: manualCandidate.beschikbaarheid || undefined,
+          languages: languages.length > 0 ? languages : undefined,
+          linkedinUrl: manualCandidate.linkedin.trim() || undefined,
+          complianceStatus: manualCandidate.big_nummer.trim()
+            ? {
+                verified: manualCandidate.kyc_status === 'verified',
+                certificates: [`BIG: ${manualCandidate.big_nummer.trim()}`],
+              }
+            : undefined,
+          cvDataUrl,
+          cvFileName,
+        };
+
+        try {
+          addStoredCandidate(newCandidate);
+        } catch {
+          setManualErrors((prev) => ({
+            ...prev,
+            cv: 'Opslaan mislukt — mogelijk is de CV te groot voor lokale opslag',
+          }));
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Vacancies are not yet persisted — keep existing simulated flow
       setIsSaving(false);
       setStep(4);
       resetManualForm();
-    }, 800);
+    } catch {
+      setIsSaving(false);
+    }
   };
 
   const stepLabels =
@@ -495,6 +617,72 @@ const ImportPage: React.FC = () => {
                         <option value="rejected">Afgewezen</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* CV upload */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-midnight mb-1.5">
+                      CV (PDF, Word of afbeelding)
+                    </label>
+                    {!cvFile ? (
+                      <div
+                        className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                          manualErrors.cv
+                            ? 'border-red-400 bg-red-50'
+                            : 'border-lightgray-800 hover:border-turquoise-500'
+                        }`}
+                        onClick={() => cvInputRef.current?.click()}
+                      >
+                        <FileText
+                          size={28}
+                          className="mx-auto mb-2 text-gray-400"
+                        />
+                        <p className="text-sm text-gray-600 mb-1">
+                          Klik om een CV te uploaden
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Max. {Math.round(MAX_CV_SIZE_BYTES / 1024 / 1024)}MB —
+                          PDF, DOC, DOCX, JPG of PNG
+                        </p>
+                        <input
+                          type="file"
+                          ref={cvInputRef}
+                          className="hidden"
+                          accept={ALLOWED_CV_EXTENSIONS}
+                          onChange={handleCvChange}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between bg-turquoise-50 border border-turquoise-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center min-w-0">
+                          <FileText
+                            size={20}
+                            className="text-turquoise-700 flex-shrink-0"
+                          />
+                          <div className="ml-3 min-w-0">
+                            <p className="text-sm font-medium text-midnight truncate">
+                              {cvFile.name}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {(cvFile.size / 1024).toFixed(0)} KB
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={clearCvFile}
+                          className="ml-3 p-1 rounded hover:bg-turquoise-100 text-gray-600 hover:text-midnight flex-shrink-0"
+                          aria-label="CV verwijderen"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    )}
+                    {manualErrors.cv && (
+                      <p className="mt-1 text-sm text-red-600" role="alert">
+                        {manualErrors.cv}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-end gap-3 mt-4">
