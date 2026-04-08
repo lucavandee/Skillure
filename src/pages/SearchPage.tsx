@@ -11,7 +11,7 @@ import MetaTags from '../components/seo/MetaTags';
 import { mockCandidates } from '../lib/mock-data';
 import { Candidate, FilterOptions } from '../types';
 import { getStoredCandidates } from '../lib/candidate-store';
-import { openCvInNewTab } from '../lib/cv-viewer';
+import { viewCv } from '../lib/cv-viewer';
 
 // Extended mock data for better demonstration
 const EXTENDED_MOCK_CANDIDATES: Candidate[] = [
@@ -485,13 +485,13 @@ const SearchPage: React.FC = () => {
                               >
                                 Contact opnemen
                               </a>
-                              {candidate.cvDataUrl && (
+                              {candidate.cvStoragePath && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    openCvInNewTab(
-                                      candidate.cvDataUrl!,
+                                    void viewCv(
+                                      candidate.cvStoragePath!,
                                       candidate.cvFileName
                                     );
                                   }}

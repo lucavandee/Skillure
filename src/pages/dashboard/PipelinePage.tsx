@@ -7,7 +7,7 @@ import Badge from '../../components/ui/Badge';
 import { Candidate } from '../../types';
 import { mockCandidates } from '../../lib/mock-data';
 import { getStoredCandidates } from '../../lib/candidate-store';
-import { openCvInNewTab } from '../../lib/cv-viewer';
+import { viewCv } from '../../lib/cv-viewer';
 
 interface Note {
   id: string;
@@ -244,15 +244,15 @@ const PipelinePage: React.FC = () => {
                           </div>
                         )}
 
-                        {candidate.cvDataUrl && (
+                        {candidate.cvStoragePath && (
                           <Button
                             variant="outline"
                             size="sm"
                             leftIcon={<FileText size={14} />}
                             onClick={(e) => {
                               e.stopPropagation();
-                              openCvInNewTab(
-                                candidate.cvDataUrl!,
+                              void viewCv(
+                                candidate.cvStoragePath!,
                                 candidate.cvFileName
                               );
                             }}
@@ -303,7 +303,7 @@ const PipelinePage: React.FC = () => {
                 </div>
 
                 {/* CV Section */}
-                {selectedCandidate.cvDataUrl && (
+                {selectedCandidate.cvStoragePath && (
                   <div className="mb-6">
                     <h3 className="font-bold mb-3 flex items-center">
                       <FileText size={18} className="mr-2" />
@@ -321,8 +321,8 @@ const PipelinePage: React.FC = () => {
                         size="sm"
                         leftIcon={<FileText size={14} />}
                         onClick={() =>
-                          openCvInNewTab(
-                            selectedCandidate.cvDataUrl!,
+                          void viewCv(
+                            selectedCandidate.cvStoragePath!,
                             selectedCandidate.cvFileName
                           )
                         }

@@ -27,7 +27,12 @@ export interface Candidate {
     verified: boolean;
     certificates: string[];
   };
-  cvDataUrl?: string;
+  /**
+   * Opaque identifier into the active CvStorage backend (see
+   * src/lib/cv-storage). For LocalCvStorage this is a localStorage key;
+   * for SupabaseCvStorage it is the bucket path.
+   */
+  cvStoragePath?: string;
   cvFileName?: string;
 }
 

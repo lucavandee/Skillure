@@ -8,11 +8,13 @@ import { Candidate } from '../types';
 import {
   addStoredCandidate,
   generateCandidateId,
-  readFileAsDataUrl,
+} from '../lib/candidate-store';
+import {
+  cvStorage,
   MAX_CV_SIZE_BYTES,
   ALLOWED_CV_TYPES,
   ALLOWED_CV_EXTENSIONS,
-} from '../lib/candidate-store';
+} from '../lib/cv-storage';
 
 interface MappingField {
   sourceField: string;
@@ -309,17 +311,22 @@ const ImportPage: React.FC = () => {
 
     try {
       if (importType === 'kandidaten') {
-        let cvDataUrl: string | undefined;
+        const candidateId = generateCandidateId();
+        let cvStoragePath: string | undefined;
         let cvFileName: string | undefined;
 
         if (cvFile) {
           try {
-            cvDataUrl = await readFileAsDataUrl(cvFile);
-            cvFileName = cvFile.name;
-          } catch {
+            const result = await cvStorage.upload(cvFile, candidateId);
+            cvStoragePath = result.storagePath;
+            cvFileName = result.fileName;
+          } catch (err) {
             setManualErrors((prev) => ({
               ...prev,
-              cv: 'Kon het CV-bestand niet lezen',
+              cv:
+                err instanceof Error && err.message
+                  ? err.message
+                  : 'Kon het CV-bestand niet opslaan',
             }));
             setIsSaving(false);
             return;
@@ -336,7 +343,7 @@ const ImportPage: React.FC = () => {
           .filter(Boolean);
 
         const newCandidate: Candidate = {
-          id: generateCandidateId(),
+          id: candidateId,
           name: manualCandidate.naam.trim(),
           role: manualCandidate.functie.trim(),
           location: manualCandidate.locatie.trim() || '-',
@@ -354,13 +361,22 @@ const ImportPage: React.FC = () => {
                 certificates: [`BIG: ${manualCandidate.big_nummer.trim()}`],
               }
             : undefined,
-          cvDataUrl,
+          cvStoragePath,
           cvFileName,
         };
 
         try {
           addStoredCandidate(newCandidate);
         } catch {
+          // Roll back the CV upload so we don't leave an orphaned file
+          // behind when the candidate record itself fails to persist.
+          if (cvStoragePath) {
+            try {
+              await cvStorage.remove(cvStoragePath);
+            } catch {
+              /* best effort */
+            }
+          }
           setManualErrors((prev) => ({
             ...prev,
             cv: 'Opslaan mislukt — mogelijk is de CV te groot voor lokale opslag',

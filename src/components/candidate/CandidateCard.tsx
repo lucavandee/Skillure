@@ -5,7 +5,7 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import { MapPin, Calendar, Globe, Github, Linkedin, ExternalLink, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { openCvInNewTab } from '../../lib/cv-viewer';
+import { viewCv } from '../../lib/cv-viewer';
 
 interface CandidateCardProps {
   candidate: Candidate;
@@ -99,7 +99,7 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, onClick }) => 
           </div>
         </div>
 
-        {candidate.cvDataUrl && (
+        {candidate.cvStoragePath && (
           <div className="mt-4">
             <Button
               variant="outline"
@@ -107,7 +107,7 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, onClick }) => 
               leftIcon={<FileText size={14} />}
               onClick={(e) => {
                 e.stopPropagation();
-                openCvInNewTab(candidate.cvDataUrl!, candidate.cvFileName);
+                void viewCv(candidate.cvStoragePath!, candidate.cvFileName);
               }}
             >
               Bekijk CV

@@ -9,7 +9,7 @@ import Button from '../ui/Button';
 import { Candidate } from '../../types';
 import { mockCandidates } from '../../lib/mock-data';
 import { getStoredCandidates } from '../../lib/candidate-store';
-import { openCvInNewTab } from '../../lib/cv-viewer';
+import { viewCv } from '../../lib/cv-viewer';
 
 const columns = [
   { id: 'nieuw', title: 'Nieuw' },
@@ -122,7 +122,7 @@ const PipelineBoard: React.FC = () => {
                                     {new Date(candidate.date).toLocaleDateString('nl-NL')}
                                   </div>
                                 </div>
-                                {candidate.cvDataUrl && (
+                                {candidate.cvStoragePath && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -130,8 +130,8 @@ const PipelineBoard: React.FC = () => {
                                     className="mt-3"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      openCvInNewTab(
-                                        candidate.cvDataUrl!,
+                                      void viewCv(
+                                        candidate.cvStoragePath!,
                                         candidate.cvFileName
                                       );
                                     }}
