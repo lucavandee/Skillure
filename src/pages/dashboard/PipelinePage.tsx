@@ -104,10 +104,10 @@ const PipelinePage: React.FC = () => {
   };
 
   const exportData = () => {
-    const data = candidates.map(({ id, name, title, status, tags, notes }) => ({
+    const data = candidates.map(({ id, name, role, status, tags, notes }) => ({
       id,
       name,
-      title,
+      gewenste_rol: role,
       status,
       tags: tags.join(', '),
       notes: notes.map(note => note.content).join(' | '),
@@ -186,7 +186,10 @@ const PipelinePage: React.FC = () => {
                           />
                           <div className="ml-3">
                             <h4 className="font-medium">{candidate.name}</h4>
-                            <p className="text-sm text-gray-600">{candidate.title}</p>
+                            <p className="text-xs text-gray-500">Gewenste rol</p>
+                            <p className="text-sm text-gray-700 font-medium">
+                              {candidate.role}
+                            </p>
                           </div>
                         </div>
 
@@ -232,7 +235,12 @@ const PipelinePage: React.FC = () => {
                     />
                     <div className="ml-4">
                       <h2 className="text-2xl font-bold">{selectedCandidate.name}</h2>
-                      <p className="text-gray-600">{selectedCandidate.title}</p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">
+                        Gewenste rol
+                      </p>
+                      <p className="text-gray-700 font-medium">
+                        {selectedCandidate.role}
+                      </p>
                     </div>
                   </div>
                   <button

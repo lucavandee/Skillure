@@ -83,7 +83,10 @@ const PipelineBoard: React.FC = () => {
                                     <h4 className="font-medium">
                                       {candidate.name}
                                     </h4>
-                                    <p className="text-sm text-gray-600">
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                      Gewenste rol
+                                    </p>
+                                    <p className="text-sm text-gray-700 font-medium">
                                       {candidate.role}
                                     </p>
                                   </div>
