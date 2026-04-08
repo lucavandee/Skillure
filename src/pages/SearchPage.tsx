@@ -155,7 +155,7 @@ const SearchPage: React.FC = () => {
         item: {
           '@type': 'Person',
           name: candidate.name,
-          jobTitle: candidate.title,
+          jobTitle: candidate.title || candidate.role,
           location: candidate.location,
           skills: candidate.skills
         }
@@ -172,6 +172,7 @@ const SearchPage: React.FC = () => {
       results = results.filter(
         candidate =>
           candidate.name.toLowerCase().includes(lowercasedTerm) ||
+          candidate.role.toLowerCase().includes(lowercasedTerm) ||
           candidate.title?.toLowerCase().includes(lowercasedTerm) ||
           candidate.skills.some(skill => skill.toLowerCase().includes(lowercasedTerm))
       );
@@ -392,7 +393,12 @@ const SearchPage: React.FC = () => {
                               </div>
                               <div className="ml-4">
                                 <h3 className="font-bold text-lg">{candidate.name}</h3>
-                                <p className="text-gray-600 text-sm">{candidate.title}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Gewenste rol
+                                </p>
+                                <p className="text-gray-700 text-sm font-medium">
+                                  {candidate.role}
+                                </p>
                               </div>
                             </div>
                             <button

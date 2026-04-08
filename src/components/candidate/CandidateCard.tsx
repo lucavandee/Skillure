@@ -52,7 +52,13 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, onClick }) => 
             </div>
             <div className="ml-4">
               <h3 className="font-bold text-lg">{candidate.name}</h3>
-              <p className="text-gray-600 text-sm">{candidate.title}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Gewenste rol</p>
+              <p className="text-gray-700 text-sm font-medium">{candidate.role}</p>
+              {candidate.title && candidate.title !== candidate.role && (
+                <p className="text-gray-500 text-xs mt-1">
+                  Huidige functie: {candidate.title}
+                </p>
+              )}
             </div>
           </div>
         </div>
