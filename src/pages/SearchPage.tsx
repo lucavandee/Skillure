@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, SlidersHorizontal, X, MapPin, Calendar, Mail, Star, Filter } from 'lucide-react';
+import { Search, SlidersHorizontal, X, MapPin, Calendar, Mail, Star, Filter, FileText } from 'lucide-react';
 import CandidateCard from '../components/candidate/CandidateCard';
 import { SearchFilters } from '../components/search/SearchFilters';
 import Input from '../components/ui/Input';
@@ -10,6 +10,8 @@ import Badge from '../components/ui/Badge';
 import MetaTags from '../components/seo/MetaTags';
 import { mockCandidates } from '../lib/mock-data';
 import { Candidate, FilterOptions } from '../types';
+import { getStoredCandidates } from '../lib/candidate-store';
+import { viewCv } from '../lib/cv-viewer';
 
 // Extended mock data for better demonstration
 const EXTENDED_MOCK_CANDIDATES: Candidate[] = [
@@ -125,8 +127,27 @@ const EXTENDED_MOCK_CANDIDATES: Candidate[] = [
 
 const SearchPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [candidates, setCandidates] = useState<Candidate[]>(EXTENDED_MOCK_CANDIDATES);
-  const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>(EXTENDED_MOCK_CANDIDATES);
+  const [candidates, setCandidates] = useState<Candidate[]>(() => [
+    ...getStoredCandidates(),
+    ...EXTENDED_MOCK_CANDIDATES,
+  ]);
+  const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>(() => [
+    ...getStoredCandidates(),
+    ...EXTENDED_MOCK_CANDIDATES,
+  ]);
+
+  useEffect(() => {
+    const refresh = () => {
+      const merged = [...getStoredCandidates(), ...EXTENDED_MOCK_CANDIDATES];
+      setCandidates(merged);
+    };
+    window.addEventListener('skillure:candidates-updated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('skillure:candidates-updated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sortBy, setSortBy] = useState('match');
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -455,7 +476,7 @@ const SearchPage: React.FC = () => {
                           </div>
 
                           <div className="mt-auto pt-4 flex items-center justify-between border-t border-lightgray-800">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <a
                                 href={`mailto:info@skillure.nl?subject=Contact%20via%20Skillure%20–%20${encodeURIComponent(candidate.name)}`}
                                 className="px-4 py-2 bg-turquoise-500 text-midnight rounded-md hover:bg-turquoise-600 transition-colors text-sm font-medium"
@@ -464,6 +485,23 @@ const SearchPage: React.FC = () => {
                               >
                                 Contact opnemen
                               </a>
+                              {candidate.cvStoragePath && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void viewCv(
+                                      candidate.cvStoragePath!,
+                                      candidate.cvFileName
+                                    );
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 border border-midnight text-midnight rounded-md hover:bg-midnight hover:text-white transition-colors text-sm font-medium"
+                                  aria-label={`Bekijk CV van ${candidate.name}`}
+                                >
+                                  <FileText size={14} />
+                                  Bekijk CV
+                                </button>
+                              )}
                               {candidate.availability === 'Direct' && (
                                 <span className="text-xs text-orange-500 font-medium">🚀 Direct beschikbaar</span>
                               )}

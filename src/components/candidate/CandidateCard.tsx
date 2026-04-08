@@ -2,8 +2,10 @@ import React from 'react';
 import { Candidate } from '../../types';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { MapPin, Calendar, Globe, Github, Linkedin, ExternalLink } from 'lucide-react';
+import Button from '../ui/Button';
+import { MapPin, Calendar, Globe, Github, Linkedin, ExternalLink, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { viewCv } from '../../lib/cv-viewer';
 
 interface CandidateCardProps {
   candidate: Candidate;
@@ -96,6 +98,22 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, onClick }) => 
             ))}
           </div>
         </div>
+
+        {candidate.cvStoragePath && (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<FileText size={14} />}
+              onClick={(e) => {
+                e.stopPropagation();
+                void viewCv(candidate.cvStoragePath!, candidate.cvFileName);
+              }}
+            >
+              Bekijk CV
+            </Button>
+          </div>
+        )}
 
         <div className="mt-auto pt-4 flex items-center justify-between border-t border-lightgray-800 mt-4">
           <div className="flex space-x-3">
