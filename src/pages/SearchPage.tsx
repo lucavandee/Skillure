@@ -172,7 +172,7 @@ const SearchPage: React.FC = () => {
       results = results.filter(
         candidate =>
           candidate.name.toLowerCase().includes(lowercasedTerm) ||
-          candidate.role.toLowerCase().includes(lowercasedTerm) ||
+          candidate.role?.toLowerCase().includes(lowercasedTerm) ||
           candidate.title?.toLowerCase().includes(lowercasedTerm) ||
           candidate.skills.some(skill => skill.toLowerCase().includes(lowercasedTerm))
       );
