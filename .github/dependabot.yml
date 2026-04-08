@@ -1,0 +1,67 @@
+version: 2
+
+updates:
+  # Frontend (Vite / React) — package.json at repo root.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "deps(npm)"
+      include: "scope"
+    groups:
+      # Group dev dependencies together so build-tool bumps don't spam
+      # the PR queue — one weekly PR instead of twenty.
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      # Production deps: only minor/patch in the grouped PR. Majors
+      # still get their own PR so they can't sneak in silently.
+      prod-dependencies-safe:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Backend (FastAPI) — requirements.txt lives in /backend.
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "deps(pip)"
+      include: "scope"
+    groups:
+      backend-safe:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # The security workflow itself — keep actions/checkout, setup-node etc.
+  # patched against their own advisories.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "deps(actions)"
