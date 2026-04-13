@@ -1,395 +1,365 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Radio, MapPin, Calendar, ExternalLink, Sparkles, Copy, Check, X, InfoIcon, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  Radio, MapPin, Calendar, X, Star, Search, Loader2,
+  Briefcase, AlertCircle, Clock, Users, ArrowRight, Filter,
+} from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import MetaTags from '../components/seo/MetaTags';
+import { vacancies, type VacancyResponse } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
 
-interface Assignment {
-  id: string;
-  title: string;
-  source: 'LinkedIn' | 'GitHub Jobs' | 'Jellow' | 'StackOverflow' | 'Indeed' | 'RemoteOK';
-  location: string;
-  duration: string;
-  rate: string;
-  compliance?: boolean;
-  updatedDaysAgo: number;
-  matches: number;
-  description: string;
-  skills: string[];
-  remote: boolean;
-}
+const STATUS_COLORS: Record<string, string> = {
+  live: 'bg-green-100 text-green-700',
+  draft: 'bg-gray-100 text-gray-700',
+  paused: 'bg-yellow-100 text-yellow-700',
+  filled: 'bg-blue-100 text-blue-700',
+};
 
-// #### MOCK DATA (vervang later door real calls) ####
-const MOCK_ASSIGNMENTS: Assignment[] = [
-  {
-    id: 'a1',
-    title: 'Senior React Developer',
-    source: 'LinkedIn',
-    location: 'Amsterdam',
-    duration: '6 maanden',
-    rate: '€80–€95/uur',
-    compliance: true,
-    updatedDaysAgo: 5,
-    matches: 8,
-    description: 'Voor een innovatieve scale-up in Amsterdam zoeken we een ervaren React developer die ons team kan versterken bij het bouwen van een nieuwe SaaS-applicatie.',
-    skills: ['React', 'TypeScript', 'Node.js', 'AWS'],
-    remote: true
-  },
-  {
-    id: 'a2',
-    title: 'Python Data Engineer',
-    source: 'Jellow',
-    location: 'Rotterdam',
-    duration: '12 maanden',
-    rate: '€85–€100/uur',
-    compliance: false,
-    updatedDaysAgo: 3,
-    matches: 5,
-    description: 'Wij zoeken een Python Data Engineer voor een groot data project bij een toonaangevende financiële instelling.',
-    skills: ['Python', 'SQL', 'Apache Spark', 'Azure'],
-    remote: false
-  },
-  {
-    id: 'a3',
-    title: 'DevOps Engineer',
-    source: 'GitHub Jobs',
-    location: 'Utrecht',
-    duration: '6 maanden',
-    rate: '€75–€90/uur',
-    compliance: false,
-    updatedDaysAgo: 2,
-    matches: 6,
-    description: 'Voor een snelgroeiende startup zoeken wij een DevOps Engineer met expertise in Kubernetes en cloud infrastructuur.',
-    skills: ['Kubernetes', 'AWS', 'Terraform', 'Docker'],
-    remote: true
-  },
-  {
-    id: 'a4',
-    title: 'Fullstack Developer',
-    source: 'StackOverflow',
-    location: 'Den Haag',
-    duration: '3 maanden',
-    rate: '€70–€85/uur',
-    compliance: true,
-    updatedDaysAgo: 1,
-    matches: 10,
-    description: 'Zoeken naar een fullstack developer voor een kort maar intensief project bij een overheidsorganisatie.',
-    skills: ['JavaScript', 'Vue.js', 'PHP', 'MySQL'],
-    remote: false
-  },
-  {
-    id: 'a5',
-    title: 'Data Analyst',
-    source: 'Indeed',
-    location: 'Eindhoven',
-    duration: '12 maanden',
-    rate: '€65–€80/uur',
-    compliance: false,
-    updatedDaysAgo: 7,
-    matches: 4,
-    description: 'Voor een tech bedrijf in Eindhoven zoeken we een data analyst die inzichten kan genereren uit grote datasets.',
-    skills: ['SQL', 'Python', 'Tableau', 'Excel'],
-    remote: false
-  },
-  {
-    id: 'a6',
-    title: 'Remote Frontend Developer',
-    source: 'RemoteOK',
-    location: 'Remote',
-    duration: '6 maanden',
-    rate: '€60–€75/uur',
-    compliance: false,
-    updatedDaysAgo: 4,
-    matches: 7,
-    description: 'Volledig remote positie voor een internationale startup. Werk aan cutting-edge frontend technologieën.',
-    skills: ['React', 'Next.js', 'TypeScript', 'GraphQL'],
-    remote: true
-  },
-];
+const STATUS_LABELS: Record<string, string> = {
+  live: 'Actief',
+  draft: 'Concept',
+  paused: 'Gepauzeerd',
+  filled: 'Ingevuld',
+};
 
 const RadarPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'bedrijf' | 'freelancer'>('bedrijf');
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-  const [showPitch, setShowPitch] = useState(false);
-  const [pitchCopied, setPitchCopied] = useState(false);
-  const [aiPitch, setAiPitch] = useState('');
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const { user } = useAuth();
+  const isRecruiterOrCompany = user?.role === 'recruiter' || user?.role === 'company' || user?.role === 'admin';
 
-  const radarPageSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'JobSearch',
-    name: 'Skillure Freelance Radar',
-    description: 'Realtime freelance opdrachten gekoppeld aan verborgen talent via AI-matching.',
-    provider: {
-      '@type': 'Organization',
-      name: 'Skillure',
-      sameAs: 'https://skillure.com'
-    }
-  };
+  const [activeTab, setActiveTab] = useState<'alle' | 'mijn'>('alle');
+  const [allVacancies, setAllVacancies] = useState<VacancyResponse[]>([]);
+  const [myVacancies, setMyVacancies] = useState<VacancyResponse[]>([]);
+  const [selectedVacancy, setSelectedVacancy] = useState<VacancyResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [favorites, setFavorites] = useState<number[]>([]);
 
   useEffect(() => {
-    // Vervang dit later door fetch('/api/assignments?type=bedrijf') / freelancer
-    setAssignments(MOCK_ASSIGNMENTS);
-  }, []);
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const promises: Promise<VacancyResponse[]>[] = [
+          vacancies.list({ status_filter: 'live' }),
+        ];
+        if (isRecruiterOrCompany) {
+          promises.push(vacancies.getMy());
+        }
 
-  const handleGeneratePitch = () => {
-    if (!selectedAssignment) return;
-    
-    setAiPitch(`Beste opdrachtgever,
+        const results = await Promise.all(promises);
+        setAllVacancies(results[0]);
+        if (results[1]) setMyVacancies(results[1]);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Kan vacatures niet laden';
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-Ik zag uw ${selectedAssignment.title} opdracht en ben zeer geïnteresseerd. Met mijn expertise in ${selectedAssignment.skills.join(', ')} kan ik direct waarde toevoegen aan uw project.
+    loadData();
+  }, [isRecruiterOrCompany]);
 
-Mijn ervaring met soortgelijke projecten en mijn beschikbaarheid voor ${selectedAssignment.duration} maken mij een ideale kandidaat voor deze opdracht.
+  // Get unique branches and locations for filter dropdowns
+  const branches = [...new Set(allVacancies.map((v) => v.branch).filter(Boolean))];
+  const locations = [...new Set(allVacancies.map((v) => v.location).filter(Boolean))];
 
-Graag plan ik een gesprek in om de mogelijkheden te bespreken.
+  // Filter logic
+  const displayVacancies = (activeTab === 'mijn' ? myVacancies : allVacancies).filter((v) => {
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matches =
+        v.title.toLowerCase().includes(term) ||
+        v.description.toLowerCase().includes(term) ||
+        v.branch.toLowerCase().includes(term) ||
+        v.location.toLowerCase().includes(term);
+      if (!matches) return false;
+    }
+    if (branchFilter && v.branch !== branchFilter) return false;
+    if (locationFilter && v.location !== locationFilter) return false;
+    return true;
+  });
 
-Met vriendelijke groet,
-[Naam]`);
-    setShowPitch(true);
-  };
-
-  const handleCopyPitch = () => {
-    navigator.clipboard.writeText(aiPitch);
-    setPitchCopied(true);
-    setTimeout(() => setPitchCopied(false), 2000);
-  };
-
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => 
-      prev.includes(id) ? prev.filter(fid => fid !== id) : [...prev, id]
+  const toggleFavorite = (id: number) => {
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]
     );
+  };
+
+  const getDaysAgo = (dateStr: string): string => {
+    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return 'Vandaag';
+    if (diff === 1) return 'Gisteren';
+    return `${diff} dagen geleden`;
   };
 
   return (
     <>
       <MetaTags
-        title="Freelance Radar - Realtime AI-matching voor freelance opdrachten"
-        description="Ontdek de nieuwste freelance opdrachten en krijg direct matches met de beste kandidaten via onze AI-matching technologie."
+        title="Vacature Radar - Overzicht van beschikbare vacatures"
+        description="Bekijk alle beschikbare vacatures en match direct de beste kandidaten uit uw bestand."
         canonical="https://skillure.com/radar"
-        schema={radarPageSchema}
       />
 
       <div className="bg-lightgray-500 min-h-screen py-8">
         <div className="container-custom">
-          {/* Introductie */}
+          {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-midnight mb-4">
-              Realtime freelance opdrachten
-            </h1>
+            <h1 className="text-4xl font-bold text-midnight mb-4">Vacature Radar</h1>
             <p className="text-lg text-gray-600 max-w-3xl">
-              Skillure verzamelt opdrachten van LinkedIn, GitHub Jobs, Jellow, StackOverflow, Indeed en RemoteOK.
-              Kies een opdracht en vind direct de beste kandidaten uit ons netwerk.
+              Overzicht van alle beschikbare vacatures. Bekijk details, match kandidaten
+              en beheer uw eigen vacatures op een centrale plek.
             </p>
           </div>
 
-          {/* Tabs: stapeling op mobiel, naast elkaar op ≥640px */}
+          {/* Tabs */}
           <div className="flex flex-col sm:flex-row sm:space-x-4 mb-6 border-b border-gray-300">
             <button
-              onClick={() => setActiveTab('bedrijf')}
+              onClick={() => setActiveTab('alle')}
               className={`w-full sm:w-auto text-center py-3 px-4 transition-colors ${
-                activeTab === 'bedrijf'
+                activeTab === 'alle'
                   ? 'border-b-2 border-turquoise-500 text-midnight font-semibold'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
-              aria-pressed={activeTab === 'bedrijf'}
             >
-              Opdrachten voor bedrijven
+              Alle vacatures ({allVacancies.length})
             </button>
-            <button
-              onClick={() => setActiveTab('freelancer')}
-              className={`w-full sm:w-auto text-center py-3 px-4 transition-colors ${
-                activeTab === 'freelancer'
-                  ? 'border-b-2 border-turquoise-500 text-midnight font-semibold'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-              aria-pressed={activeTab === 'freelancer'}
-            >
-              Opdrachten voor freelancers
-            </button>
+            {isRecruiterOrCompany && (
+              <button
+                onClick={() => setActiveTab('mijn')}
+                className={`w-full sm:w-auto text-center py-3 px-4 transition-colors ${
+                  activeTab === 'mijn'
+                    ? 'border-b-2 border-turquoise-500 text-midnight font-semibold'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Mijn vacatures ({myVacancies.length})
+              </button>
+            )}
           </div>
 
-          {/* Assignment Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {assignments
-              .filter(a => {
-                // placeholder filtering: alle opdrachten tonen ongeacht tab
-                return true;
-              })
-              .map(assign => (
+          {/* Filters */}
+          <div className="mb-6 flex flex-col sm:flex-row gap-3">
+            <div className="flex-grow relative">
+              <input
+                type="text"
+                placeholder="Zoek op titel, branche of locatie..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-field w-full pl-10"
+              />
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            </div>
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className="input-field py-2 px-3 text-sm"
+            >
+              <option value="">Alle branches</option>
+              {branches.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="input-field py-2 px-3 text-sm"
+            >
+              <option value="">Alle locaties</option>
+              {locations.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-16">
+              <Loader2 size={32} className="animate-spin text-turquoise-500 mx-auto mb-4" />
+              <p className="text-gray-600">Vacatures laden...</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <Card className="p-6 mb-6 border-red-200">
+              <div className="flex items-center gap-3 text-red-600">
+                <AlertCircle size={20} />
+                <p>{error}</p>
+              </div>
+            </Card>
+          )}
+
+          {/* Vacancy Cards Grid */}
+          {!loading && displayVacancies.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayVacancies.map((vacancy) => (
                 <motion.div
-                  key={assign.id}
+                  key={vacancy.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ y: -5 }}
+                  whileHover={{ y: -4 }}
                   transition={{ duration: 0.3 }}
                   className="h-full"
                 >
                   <Card
                     className="h-full flex flex-col justify-between hover:shadow-lg transition-all duration-300 cursor-pointer"
                     hoverable
-                    onClick={() => setSelectedAssignment(assign)}
+                    onClick={() => setSelectedVacancy(vacancy)}
                   >
-                    {/* Header met source en titel */}
+                    {/* Header */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <div className="w-5 h-5 bg-turquoise-500 rounded-sm flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">
-                              {assign.source.charAt(0)}
-                            </span>
-                          </div>
-                          <span className="text-sm text-gray-600">{assign.source}</span>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge className={STATUS_COLORS[vacancy.status] || 'bg-gray-100 text-gray-700'}>
+                            {STATUS_LABELS[vacancy.status] || vacancy.status}
+                          </Badge>
+                          <span className="text-xs text-gray-500">{vacancy.branch}</span>
                         </div>
-                        <h2 className="text-lg font-semibold text-midnight mb-2 line-clamp-2">
-                          {assign.title}
+                        <h2 className="text-lg font-semibold text-midnight mb-1 line-clamp-2">
+                          {vacancy.title}
                         </h2>
                       </div>
-                      <div className="flex items-center gap-2 ml-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(assign.id);
-                          }}
-                          className={`p-1 rounded-full hover:bg-lightgray-500 transition-colors ${
-                            favorites.includes(assign.id) ? 'text-yellow-500' : 'text-gray-400'
-                          }`}
-                          aria-label={favorites.includes(assign.id) ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
-                        >
-                          <Star size={16} />
-                        </button>
-                        <Badge variant="primary" className="text-xs">
-                          {assign.matches} matches
-                        </Badge>
-                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(vacancy.id);
+                        }}
+                        className={`p-1 rounded-full hover:bg-lightgray-500 transition-colors ${
+                          favorites.includes(vacancy.id) ? 'text-yellow-500' : 'text-gray-400'
+                        }`}
+                        aria-label={favorites.includes(vacancy.id) ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
+                      >
+                        <Star size={16} fill={favorites.includes(vacancy.id) ? 'currentColor' : 'none'} />
+                      </button>
                     </div>
 
-                    {/* Body: locatie, duur, tarief, compliance */}
+                    {/* Details */}
                     <div className="mb-4 space-y-2">
                       <div className="flex items-center text-sm text-gray-600">
                         <MapPin size={14} className="mr-2 text-gray-400" />
-                        {assign.location}
-                        {assign.remote && (
-                          <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                            Remote
-                          </span>
-                        )}
+                        {vacancy.location}
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
-                        <Calendar size={14} className="mr-2 text-gray-400" />
-                        {assign.duration}
+                        <Clock size={14} className="mr-2 text-gray-400" />
+                        {vacancy.duration}
                       </div>
                       <div className="flex items-center text-sm text-gray-600">
-                        <span className="mr-2">💰</span>
-                        {assign.rate}
+                        <Briefcase size={14} className="mr-2 text-gray-400" />
+                        {vacancy.rate_min} - {vacancy.rate_max} /uur
                       </div>
-                      {assign.compliance && (
-                        <div className="flex items-center text-sm text-green-600">
-                          <Check size={14} className="mr-2" />
-                          KYC-gecontroleerd
+                      {vacancy.availability && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Calendar size={14} className="mr-2 text-gray-400" />
+                          {vacancy.availability}
                         </div>
                       )}
                     </div>
 
-                    {/* Skills */}
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1">
-                        {assign.skills.slice(0, 3).map((skill, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {skill}
-                          </Badge>
-                        ))}
-                        {assign.skills.length > 3 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{assign.skills.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                    {/* Description preview */}
+                    <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+                      {vacancy.description}
+                    </p>
 
-                    {/* Footer: last updated + CTA knoppen */}
+                    {/* Footer */}
                     <div className="mt-auto">
-                      <p className="text-xs text-gray-500 mb-3">
-                        Bijgewerkt {assign.updatedDaysAgo} dagen geleden
+                      <p className="text-xs text-gray-400 mb-3">
+                        Geplaatst {getDaysAgo(vacancy.created_at)}
                       </p>
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert(`Kandidaten voor ${assign.title} worden geladen…`);
-                          }}
-                          className="w-full"
-                          aria-label={`Bekijk kandidaten voor ${assign.title}`}
+                      <div className="flex gap-2">
+                        <Link
+                          to={`/vacature/${vacancy.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1"
                         >
-                          Bekijk kandidaten
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedAssignment(assign);
-                            handleGeneratePitch();
-                          }}
-                          className="w-full"
-                          aria-label={`Solliciteer via AI voor ${assign.title}`}
-                        >
-                          Solliciteer via AI
-                        </Button>
+                          <Button variant="primary" size="sm" className="w-full">
+                            Bekijk details
+                          </Button>
+                        </Link>
+                        {isRecruiterOrCompany && (
+                          <Link
+                            to="/search"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Button variant="outline" size="sm" leftIcon={<Users size={14} />}>
+                              Match
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </Card>
                 </motion.div>
               ))}
-          </div>
+            </div>
+          )}
 
-          {/* Als er geen opdrachten zijn */}
-          {assignments.length === 0 && (
+          {/* Empty State */}
+          {!loading && !error && displayVacancies.length === 0 && (
             <div className="text-center text-gray-700 mt-12">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-lightgray-500 rounded-full mb-4">
                 <Radio size={24} className="text-gray-500" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Geen opdrachten gevonden</h3>
-              <p className="text-gray-600">Probeer later opnieuw of pas uw filters aan.</p>
+              <h3 className="text-xl font-bold mb-2">Geen vacatures gevonden</h3>
+              <p className="text-gray-600 mb-4">
+                {searchTerm || branchFilter || locationFilter
+                  ? 'Pas uw filters aan om meer resultaten te zien.'
+                  : 'Er zijn momenteel geen actieve vacatures beschikbaar.'}
+              </p>
+              {(searchTerm || branchFilter || locationFilter) && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setBranchFilter('');
+                    setLocationFilter('');
+                  }}
+                >
+                  Wis filters
+                </Button>
+              )}
             </div>
           )}
 
-          {/* Assignment Detail Modal */}
+          {/* Vacancy Detail Modal */}
           <AnimatePresence>
-            {selectedAssignment && (
-              <div 
+            {selectedVacancy && (
+              <div
                 className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
                 role="dialog"
                 aria-modal="true"
-                aria-labelledby="modal-title"
+                aria-labelledby="vacancy-modal-title"
+                onClick={() => setSelectedVacancy(null)}
               >
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-6">
                       <div>
-                        <h2 id="modal-title" className="text-2xl font-bold mb-2">
-                          {selectedAssignment.title}
-                        </h2>
-                        <div className="flex items-center text-gray-600">
-                          <div className="w-4 h-4 bg-turquoise-500 rounded-sm flex items-center justify-center mr-2">
-                            <span className="text-white text-xs font-bold">
-                              {selectedAssignment.source.charAt(0)}
-                            </span>
-                          </div>
-                          <span>{selectedAssignment.source}</span>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge className={STATUS_COLORS[selectedVacancy.status] || 'bg-gray-100 text-gray-700'}>
+                            {STATUS_LABELS[selectedVacancy.status] || selectedVacancy.status}
+                          </Badge>
+                          <span className="text-sm text-gray-500">{selectedVacancy.branch}</span>
                         </div>
+                        <h2 id="vacancy-modal-title" className="text-2xl font-bold">
+                          {selectedVacancy.title}
+                        </h2>
                       </div>
                       <button
-                        onClick={() => setSelectedAssignment(null)}
+                        onClick={() => setSelectedVacancy(null)}
                         className="text-gray-500 hover:text-gray-700"
                         aria-label="Sluit modal"
                       >
@@ -403,37 +373,37 @@ Met vriendelijke groet,
                         <div className="space-y-3">
                           <div className="flex items-center text-gray-600">
                             <MapPin size={16} className="mr-2" />
-                            {selectedAssignment.location}
-                            {selectedAssignment.remote && (
-                              <span className="ml-2 text-sm bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                Remote mogelijk
-                              </span>
-                            )}
+                            {selectedVacancy.location}
                           </div>
                           <div className="flex items-center text-gray-600">
-                            <Calendar size={16} className="mr-2" />
-                            {selectedAssignment.duration}
+                            <Clock size={16} className="mr-2" />
+                            {selectedVacancy.duration}
                           </div>
-                          <div className="text-gray-600">
-                            💰 {selectedAssignment.rate}
+                          <div className="flex items-center text-gray-600">
+                            <Briefcase size={16} className="mr-2" />
+                            {selectedVacancy.rate_min} - {selectedVacancy.rate_max} /uur
                           </div>
-                          {selectedAssignment.compliance && (
-                            <div className="flex items-center text-green-600">
-                              <Check size={16} className="mr-2" />
-                              KYC-gecontroleerd
+                          {selectedVacancy.availability && (
+                            <div className="flex items-center text-gray-600">
+                              <Calendar size={16} className="mr-2" />
+                              {selectedVacancy.availability}
+                            </div>
+                          )}
+                          {selectedVacancy.big_number && (
+                            <div className="text-sm text-gray-500">
+                              BIG/KvK: {selectedVacancy.big_number}
                             </div>
                           )}
                         </div>
                       </div>
 
                       <div>
-                        <h3 className="font-bold mb-3">Skills</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedAssignment.skills.map((skill) => (
-                            <Badge key={skill} variant="secondary">
-                              {skill}
-                            </Badge>
-                          ))}
+                        <h3 className="font-bold mb-3">Tijdlijn</h3>
+                        <div className="space-y-2 text-sm text-gray-600">
+                          <p>Aangemaakt: {new Date(selectedVacancy.created_at).toLocaleDateString('nl-NL')}</p>
+                          {selectedVacancy.updated_at && (
+                            <p>Bijgewerkt: {new Date(selectedVacancy.updated_at).toLocaleDateString('nl-NL')}</p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -441,36 +411,22 @@ Met vriendelijke groet,
                     <div className="mb-6">
                       <h3 className="font-bold mb-3">Beschrijving</h3>
                       <p className="text-gray-600 whitespace-pre-line">
-                        {selectedAssignment.description}
+                        {selectedVacancy.description}
                       </p>
                     </div>
 
-                    <div className="border-t border-lightgray-800 pt-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold">AI-gegenereerde Pitch</h3>
-                        <Button
-                          variant="primary"
-                          leftIcon={<Sparkles size={18} />}
-                          onClick={handleGeneratePitch}
-                        >
-                          Genereer Pitch
+                    <div className="border-t border-lightgray-800 pt-4 flex gap-3">
+                      <Link to={`/vacature/${selectedVacancy.id}`} className="flex-1">
+                        <Button variant="primary" className="w-full">
+                          Volledige pagina bekijken
                         </Button>
-                      </div>
-
-                      {showPitch && (
-                        <div className="bg-lightgray-500 rounded-lg p-4 relative">
-                          <p className="text-gray-700 mb-4 whitespace-pre-line">
-                            {aiPitch}
-                          </p>
-                          <Button
-                            variant="outline"
-                            leftIcon={pitchCopied ? <Check size={18} /> : <Copy size={18} />}
-                            onClick={handleCopyPitch}
-                            className="w-full"
-                          >
-                            {pitchCopied ? 'Gekopieerd!' : 'Kopieer Pitch'}
+                      </Link>
+                      {isRecruiterOrCompany && (
+                        <Link to="/search">
+                          <Button variant="outline" leftIcon={<Users size={16} />}>
+                            Kandidaten zoeken
                           </Button>
-                        </div>
+                        </Link>
                       )}
                     </div>
                   </div>

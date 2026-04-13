@@ -1,156 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Search, SlidersHorizontal, X, MapPin, Calendar, Mail, Star, Filter, FileText } from 'lucide-react';
-import CandidateCard from '../components/candidate/CandidateCard';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Search, SlidersHorizontal, X, MapPin, Calendar, Mail, Phone,
+  Star, ExternalLink, AlertCircle, Loader2, ChevronDown,
+} from 'lucide-react';
 import { SearchFilters } from '../components/search/SearchFilters';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import MetaTags from '../components/seo/MetaTags';
-import { mockCandidates } from '../lib/mock-data';
-import { Candidate, FilterOptions } from '../types';
-import { getStoredCandidates } from '../lib/candidate-store';
-import { viewCv } from '../lib/cv-viewer';
+import { candidates, type CandidateProfileResponse } from '../lib/api';
+import { FilterOptions } from '../types';
 
-// Extended mock data for better demonstration
-const EXTENDED_MOCK_CANDIDATES: Candidate[] = [
-  {
-    id: '1',
-    name: 'Daan Janssen',
-    title: 'Machine Learning Engineer',
-    role: 'Machine Learning Engineer',
-    location: 'Amsterdam',
-    avatar: 'https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg',
-    matchScore: 95,
-    status: 'available',
-    date: '2024-02-20',
-    skills: ['Python', 'TensorFlow', 'Docker', 'AWS', 'Kubernetes'],
-    experience: '5-10 jaar',
-    availability: 'Direct',
-    languages: ['Nederlands', 'Engels'],
-    lastActivity: '2 dagen geleden',
-    githubUrl: 'https://github.com/daan-janssen',
-    linkedinUrl: 'https://linkedin.com/in/daan-janssen',
-    portfolio: 'https://daanjanssen.dev'
-  },
-  {
-    id: '2',
-    name: 'Sanne Verhoeven',
-    title: 'Frontend Developer',
-    role: 'Frontend Developer',
-    location: 'Rotterdam',
-    avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg',
-    matchScore: 88,
-    status: 'available',
-    date: '2024-02-19',
-    skills: ['React', 'TypeScript', 'Tailwind CSS', 'Next.js', 'GraphQL'],
-    experience: '3-5 jaar',
-    availability: 'Binnen 2 weken',
-    languages: ['Nederlands', 'Engels', 'Duits'],
-    lastActivity: '1 dag geleden',
-    githubUrl: 'https://github.com/sanne-verhoeven',
-    linkedinUrl: 'https://linkedin.com/in/sanne-verhoeven'
-  },
-  {
-    id: '3',
-    name: 'Lucas van der Berg',
-    title: 'DevOps Engineer',
-    role: 'DevOps Engineer',
-    location: 'Utrecht',
-    avatar: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg',
-    matchScore: 92,
-    status: 'available',
-    date: '2024-02-18',
-    skills: ['Kubernetes', 'AWS', 'Terraform', 'Docker', 'Jenkins'],
-    experience: '5-10 jaar',
-    availability: 'Direct',
-    languages: ['Nederlands', 'Engels'],
-    lastActivity: '3 dagen geleden',
-    githubUrl: 'https://github.com/lucas-vdberg',
-    linkedinUrl: 'https://linkedin.com/in/lucas-vdberg'
-  },
-  {
-    id: '4',
-    name: 'Emma Bakker',
-    title: 'Data Scientist',
-    role: 'Data Scientist',
-    location: 'Den Haag',
-    avatar: 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg',
-    matchScore: 85,
-    status: 'available',
-    date: '2024-02-17',
-    skills: ['Python', 'R', 'SQL', 'Machine Learning', 'Tableau'],
-    experience: '3-5 jaar',
-    availability: 'Binnen 1 maand',
-    languages: ['Nederlands', 'Engels', 'Frans'],
-    lastActivity: '1 week geleden',
-    githubUrl: 'https://github.com/emma-bakker',
-    linkedinUrl: 'https://linkedin.com/in/emma-bakker'
-  },
-  {
-    id: '5',
-    name: 'Tom de Wit',
-    title: 'Full Stack Developer',
-    role: 'Full Stack Developer',
-    location: 'Eindhoven',
-    avatar: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg',
-    matchScore: 90,
-    status: 'available',
-    date: '2024-02-16',
-    skills: ['JavaScript', 'Node.js', 'React', 'PostgreSQL', 'MongoDB'],
-    experience: '1-3 jaar',
-    availability: 'Direct',
-    languages: ['Nederlands', 'Engels'],
-    lastActivity: '5 dagen geleden',
-    githubUrl: 'https://github.com/tom-dewit',
-    linkedinUrl: 'https://linkedin.com/in/tom-dewit'
-  },
-  {
-    id: '6',
-    name: 'Lisa Jansen',
-    title: 'UX/UI Designer',
-    role: 'UX/UI Designer',
-    location: 'Amsterdam',
-    avatar: 'https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg',
-    matchScore: 87,
-    status: 'available',
-    date: '2024-02-15',
-    skills: ['Figma', 'Adobe XD', 'Sketch', 'Prototyping', 'User Research'],
-    experience: '3-5 jaar',
-    availability: 'Binnen 2 weken',
-    languages: ['Nederlands', 'Engels'],
-    lastActivity: '4 dagen geleden',
-    portfolio: 'https://lisajansen.design'
-  }
-];
+const PAGE_SIZE = 20;
 
 const SearchPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [candidates, setCandidates] = useState<Candidate[]>(() => [
-    ...getStoredCandidates(),
-    ...EXTENDED_MOCK_CANDIDATES,
-  ]);
-  const [filteredCandidates, setFilteredCandidates] = useState<Candidate[]>(() => [
-    ...getStoredCandidates(),
-    ...EXTENDED_MOCK_CANDIDATES,
-  ]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [results, setResults] = useState<CandidateProfileResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [skip, setSkip] = useState(0);
 
-  useEffect(() => {
-    const refresh = () => {
-      const merged = [...getStoredCandidates(), ...EXTENDED_MOCK_CANDIDATES];
-      setCandidates(merged);
-    };
-    window.addEventListener('skillure:candidates-updated', refresh);
-    window.addEventListener('storage', refresh);
-    return () => {
-      window.removeEventListener('skillure:candidates-updated', refresh);
-      window.removeEventListener('storage', refresh);
-    };
-  }, []);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [sortBy, setSortBy] = useState('match');
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateProfileResponse | null>(null);
+  const [favorites, setFavorites] = useState<number[]>([]);
+
   const [filters, setFilters] = useState<FilterOptions>({
     experience: [],
     location: [],
@@ -159,109 +37,72 @@ const SearchPage: React.FC = () => {
     languages: [],
     matchScore: 0,
     remote: undefined,
-    branch: []
+    branch: [],
   });
 
-  const searchPageSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'SearchResultsPage',
-    name: 'Zoek Kandidaten - Skillure',
-    description: 'Vind de beste kandidaten voor uw vacature met AI-matching technologie',
-    mainEntity: {
-      '@type': 'ItemList',
-      numberOfItems: filteredCandidates.length,
-      itemListElement: filteredCandidates.map((candidate, index) => ({
-        '@type': 'ListItem',
-        position: index + 1,
-        item: {
-          '@type': 'Person',
-          name: candidate.name,
-          jobTitle: candidate.title || candidate.role,
-          location: candidate.location,
-          skills: candidate.skills
-        }
-      }))
-    }
-  };
-
+  // Debounce search input
   useEffect(() => {
-    let results = [...candidates];
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-    // Search term filtering
-    if (searchTerm) {
-      const lowercasedTerm = searchTerm.toLowerCase();
-      results = results.filter(
-        candidate =>
-          candidate.name.toLowerCase().includes(lowercasedTerm) ||
-          candidate.role?.toLowerCase().includes(lowercasedTerm) ||
-          candidate.title?.toLowerCase().includes(lowercasedTerm) ||
-          candidate.skills.some(skill => skill.toLowerCase().includes(lowercasedTerm))
-      );
+  // Fetch candidates from API
+  const fetchCandidates = useCallback(async (offset = 0, append = false) => {
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
+    setError(null);
+
+    try {
+      const params: {
+        skill?: string;
+        location?: string;
+        availability?: string;
+        skip?: number;
+        limit?: number;
+      } = {
+        skip: offset,
+        limit: PAGE_SIZE,
+      };
+
+      // Use search term as skill filter
+      if (debouncedSearch) params.skill = debouncedSearch;
+
+      // Apply sidebar filters
+      if (filters.location && filters.location.length > 0) {
+        params.location = filters.location[0]; // API accepts single location
+      }
+      if (filters.availability && filters.availability.length > 0) {
+        params.availability = filters.availability[0];
+      }
+      if (filters.skills && filters.skills.length > 0 && !debouncedSearch) {
+        params.skill = filters.skills[0]; // API accepts single skill
+      }
+
+      const data = await candidates.search(params);
+      if (append) {
+        setResults((prev) => [...prev, ...data]);
+      } else {
+        setResults(data);
+      }
+      setHasMore(data.length === PAGE_SIZE);
+      setSkip(offset + data.length);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Kan kandidaten niet laden';
+      setError(message);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
+  }, [debouncedSearch, filters]);
 
-    // Apply filters
-    if (filters.experience && filters.experience.length > 0) {
-      results = results.filter(candidate => 
-        filters.experience?.includes(candidate.experience || '')
-      );
-    }
+  // Re-fetch when search or filters change
+  useEffect(() => {
+    fetchCandidates(0, false);
+  }, [fetchCandidates]);
 
-    if (filters.location && filters.location.length > 0) {
-      results = results.filter(candidate => 
-        candidate.location && filters.location?.includes(candidate.location)
-      );
-    }
-
-    if (filters.skills && filters.skills.length > 0) {
-      results = results.filter(candidate =>
-        filters.skills?.some(skill => candidate.skills.includes(skill))
-      );
-    }
-
-    if (filters.availability && filters.availability.length > 0) {
-      results = results.filter(candidate => 
-        candidate.availability && filters.availability?.includes(candidate.availability)
-      );
-    }
-
-    if (filters.languages && filters.languages.length > 0) {
-      results = results.filter(candidate =>
-        candidate.languages?.some(language => filters.languages?.includes(language))
-      );
-    }
-
-    if (filters.matchScore && filters.matchScore > 0) {
-      results = results.filter(candidate =>
-        candidate.matchScore && candidate.matchScore >= (filters.matchScore || 0)
-      );
-    }
-
-    // Sorting
-    switch (sortBy) {
-      case 'match':
-        results.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
-        break;
-      case 'recent':
-        results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        break;
-      case 'experience-high':
-        results.sort((a, b) => {
-          const experienceOrder = { '10+ jaar': 4, '5-10 jaar': 3, '3-5 jaar': 2, '1-3 jaar': 1, '< 1 jaar': 0 };
-          return (experienceOrder[b.experience as keyof typeof experienceOrder] || 0) - 
-                 (experienceOrder[a.experience as keyof typeof experienceOrder] || 0);
-        });
-        break;
-      case 'experience-low':
-        results.sort((a, b) => {
-          const experienceOrder = { '10+ jaar': 4, '5-10 jaar': 3, '3-5 jaar': 2, '1-3 jaar': 1, '< 1 jaar': 0 };
-          return (experienceOrder[a.experience as keyof typeof experienceOrder] || 0) - 
-                 (experienceOrder[b.experience as keyof typeof experienceOrder] || 0);
-        });
-        break;
-    }
-
-    setFilteredCandidates(results);
-  }, [searchTerm, filters, candidates, sortBy]);
+  const handleLoadMore = () => {
+    fetchCandidates(skip, true);
+  };
 
   const handleFilterChange = (newFilters: FilterOptions) => {
     setFilters(newFilters);
@@ -271,34 +112,37 @@ const SearchPage: React.FC = () => {
     setSearchTerm('');
   };
 
-  const toggleFavorite = (candidateId: string) => {
-    setFavorites(prev => 
-      prev.includes(candidateId) 
-        ? prev.filter(id => id !== candidateId)
+  const toggleFavorite = (candidateId: number) => {
+    setFavorites((prev) =>
+      prev.includes(candidateId)
+        ? prev.filter((id) => id !== candidateId)
         : [...prev, candidateId]
     );
   };
 
-  const handleLoadMore = () => {
-    alert('Functionaliteit "Meer laden" wordt nog gebouwd...');
+  const getSkillLevel = (level: number): string => {
+    if (level >= 5) return 'Expert';
+    if (level >= 4) return 'Senior';
+    if (level >= 3) return 'Medior';
+    if (level >= 2) return 'Junior';
+    return 'Starter';
   };
 
   return (
     <>
       <MetaTags
         title="Zoek Kandidaten"
-        description="Ontdek de beste kandidaten voor uw vacature met onze AI-matching technologie. Filter op vaardigheden, ervaring, locatie en meer."
+        description="Vind de beste kandidaten voor uw vacature met Skillure."
         canonical="https://skillure.com/search"
         type="website"
-        schema={searchPageSchema}
       />
-      
+
       <div className="bg-lightgray-500 min-h-screen">
         <div className="container-custom py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Zoek Kandidaten</h1>
             <p className="text-gray-600">
-              Ontdek de beste kandidaten voor uw vacature met onze AI-matching technologie
+              Doorzoek het kandidatenbestand op vaardigheden, locatie en beschikbaarheid
             </p>
           </div>
 
@@ -306,7 +150,7 @@ const SearchPage: React.FC = () => {
             {/* Sidebar Filters - Desktop */}
             <div className="hidden lg:block lg:w-1/4">
               <div className="sticky top-24">
-                <SearchFilters 
+                <SearchFilters
                   filters={filters}
                   onFilterChange={handleFilterChange}
                 />
@@ -319,7 +163,7 @@ const SearchPage: React.FC = () => {
               <div className="mb-6 flex flex-col sm:flex-row gap-3">
                 <div className="flex-grow relative">
                   <Input
-                    placeholder="Zoek op naam, vaardigheden of titel..."
+                    placeholder="Zoek op vaardigheid (bijv. Python, React, AWS...)"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     icon={<Search size={18} className="text-gray-400" />}
@@ -350,7 +194,7 @@ const SearchPage: React.FC = () => {
               {/* Mobile Filters */}
               {showMobileFilters && (
                 <div id="mobile-filters" className="mb-6 lg:hidden">
-                  <SearchFilters 
+                  <SearchFilters
                     filters={filters}
                     onFilterChange={handleFilterChange}
                   />
@@ -360,28 +204,33 @@ const SearchPage: React.FC = () => {
               {/* Results Header */}
               <div className="mb-4 flex justify-between items-center">
                 <p className="text-gray-600" aria-live="polite">
-                  {filteredCandidates.length} kandidaten gevonden
+                  {loading ? 'Zoeken...' : `${results.length} kandidaten gevonden`}
                 </p>
-                <div className="flex gap-2">
-                  <select 
-                    className="input-field py-1.5 px-3 text-sm"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    aria-label="Sorteer resultaten"
-                  >
-                    <option value="match">Sorteer op match</option>
-                    <option value="recent">Recent actief</option>
-                    <option value="experience-high">Ervaring: hoog-laag</option>
-                    <option value="experience-low">Ervaring: laag-hoog</option>
-                  </select>
-                </div>
               </div>
 
+              {/* Error State */}
+              {error && (
+                <Card className="p-6 mb-6 border-red-200">
+                  <div className="flex items-center gap-3 text-red-600">
+                    <AlertCircle size={20} />
+                    <p>{error}</p>
+                  </div>
+                </Card>
+              )}
+
+              {/* Loading State */}
+              {loading && (
+                <div className="text-center py-12">
+                  <Loader2 size={32} className="animate-spin text-turquoise-500 mx-auto mb-4" />
+                  <p className="text-gray-600">Kandidaten laden...</p>
+                </div>
+              )}
+
               {/* Results Grid */}
-              {filteredCandidates.length > 0 ? (
+              {!loading && results.length > 0 && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {filteredCandidates.map((candidate) => (
+                    {results.map((candidate) => (
                       <motion.div
                         key={candidate.id}
                         initial={{ opacity: 0, y: 20 }}
@@ -389,37 +238,25 @@ const SearchPage: React.FC = () => {
                         transition={{ duration: 0.3 }}
                         className="h-full"
                       >
-                        <Card 
-                          className="h-full flex flex-col cursor-pointer hover:border-turquoise-400 transition-all duration-300" 
+                        <Card
+                          className="h-full flex flex-col cursor-pointer hover:border-turquoise-400 transition-all duration-300"
                           hoverable
                           bordered
-                          onClick={() => {
-                            console.log('Selected candidate:', candidate);
-                            alert(`Kandidaat profiel voor ${candidate.name} wordt nog gebouwd!`);
-                          }}
+                          onClick={() => setSelectedCandidate(candidate)}
                         >
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center">
-                              <div className="relative">
-                                <img 
-                                  src={candidate.avatar} 
-                                  alt={`Avatar van ${candidate.name}`} 
-                                  className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" 
-                                />
-                                {candidate.matchScore && (
-                                  <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-turquoise-500 text-midnight rounded-full flex items-center justify-center text-xs font-bold border-2 border-white">
-                                    {candidate.matchScore}
-                                  </div>
-                                )}
+                              <div className="w-14 h-14 rounded-full bg-turquoise-100 text-turquoise-700 flex items-center justify-center text-lg font-bold">
+                                {(candidate.summary || 'K').charAt(0).toUpperCase()}
                               </div>
                               <div className="ml-4">
-                                <h3 className="font-bold text-lg">{candidate.name}</h3>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  Gewenste rol
-                                </p>
-                                <p className="text-gray-700 text-sm font-medium">
-                                  {candidate.role}
-                                </p>
+                                <h3 className="font-bold text-lg">Kandidaat #{candidate.id}</h3>
+                                {candidate.location && (
+                                  <p className="text-sm text-gray-500 flex items-center mt-1">
+                                    <MapPin size={14} className="mr-1" />
+                                    {candidate.location}
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <button
@@ -432,83 +269,83 @@ const SearchPage: React.FC = () => {
                               }`}
                               aria-label={favorites.includes(candidate.id) ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
                             >
-                              <Star size={20} />
+                              <Star size={20} fill={favorites.includes(candidate.id) ? 'currentColor' : 'none'} />
                             </button>
                           </div>
 
-                          <div className="space-y-3 mb-4">
-                            {candidate.location && (
-                              <div className="flex items-center text-sm text-gray-600">
-                                <MapPin size={16} className="mr-2 text-gray-400" />
-                                {candidate.location}
-                              </div>
-                            )}
-                            
+                          {/* Summary */}
+                          {candidate.summary && (
+                            <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                              {candidate.summary}
+                            </p>
+                          )}
+
+                          {/* Info rows */}
+                          <div className="space-y-2 mb-4">
                             {candidate.availability && (
                               <div className="flex items-center text-sm text-gray-600">
-                                <Calendar size={16} className="mr-2 text-gray-400" />
+                                <Calendar size={14} className="mr-2 text-gray-400" />
                                 {candidate.availability}
                               </div>
                             )}
-                            
-                            {candidate.experience && (
-                              <div className="flex items-center text-sm text-gray-600">
-                                <span className="mr-2">💼</span>
-                                {candidate.experience} ervaring
+                          </div>
+
+                          {/* Skills */}
+                          {candidate.skills.length > 0 && (
+                            <div className="mb-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                {candidate.skills.slice(0, 4).map((skill) => (
+                                  <Badge key={skill.id} variant="primary" className="text-xs">
+                                    {skill.skill_name}
+                                    {skill.level > 1 && (
+                                      <span className="ml-1 opacity-70">({getSkillLevel(skill.level)})</span>
+                                    )}
+                                  </Badge>
+                                ))}
+                                {candidate.skills.length > 4 && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    +{candidate.skills.length - 4} meer
+                                  </Badge>
+                                )}
                               </div>
-                            )}
-                          </div>
-
-                          <div className="mb-4">
-                            <p className="text-sm text-gray-500 mb-2">Top skills:</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {candidate.skills.slice(0, 4).map((skill, index) => (
-                                <Badge key={index} variant="primary" className="text-xs">
-                                  {skill}
-                                </Badge>
-                              ))}
-                              {candidate.skills.length > 4 && (
-                                <Badge variant="secondary" className="text-xs">
-                                  +{candidate.skills.length - 4} meer
-                                </Badge>
-                              )}
                             </div>
-                          </div>
+                          )}
 
+                          {/* Footer */}
                           <div className="mt-auto pt-4 flex items-center justify-between border-t border-lightgray-800">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <a
-                                href={`mailto:info@skillure.nl?subject=Contact%20via%20Skillure%20–%20${encodeURIComponent(candidate.name)}`}
-                                className="px-4 py-2 bg-turquoise-500 text-midnight rounded-md hover:bg-turquoise-600 transition-colors text-sm font-medium"
-                                onClick={(e) => e.stopPropagation()}
-                                aria-label={`Stuur e-mail naar ${candidate.name}`}
-                              >
-                                Contact opnemen
-                              </a>
-                              {candidate.cvStoragePath && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void viewCv(
-                                      candidate.cvStoragePath!,
-                                      candidate.cvFileName
-                                    );
-                                  }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-2 border border-midnight text-midnight rounded-md hover:bg-midnight hover:text-white transition-colors text-sm font-medium"
-                                  aria-label={`Bekijk CV van ${candidate.name}`}
+                            <div className="flex items-center gap-2">
+                              {candidate.linkedin_url && (
+                                <a
+                                  href={candidate.linkedin_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
                                 >
-                                  <FileText size={14} />
-                                  Bekijk CV
-                                </button>
+                                  LinkedIn <ExternalLink size={12} />
+                                </a>
                               )}
-                              {candidate.availability === 'Direct' && (
-                                <span className="text-xs text-orange-500 font-medium">🚀 Direct beschikbaar</span>
+                              {candidate.github_url && (
+                                <a
+                                  href={candidate.github_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-gray-600 hover:text-gray-800 text-xs flex items-center gap-1"
+                                >
+                                  GitHub <ExternalLink size={12} />
+                                </a>
                               )}
                             </div>
-                            <div className="text-xs text-gray-500">
-                              Actief: {candidate.lastActivity}
-                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCandidate(candidate);
+                              }}
+                              className="text-turquoise-600 text-sm font-medium hover:underline"
+                            >
+                              Bekijk profiel
+                            </button>
                           </div>
                         </Card>
                       </motion.div>
@@ -516,18 +353,31 @@ const SearchPage: React.FC = () => {
                   </div>
 
                   {/* Load More Button */}
-                  <div className="mt-8 text-center">
-                    <Button
-                      variant="outline"
-                      onClick={handleLoadMore}
-                      className="px-8"
-                    >
-                      Meer laden
-                    </Button>
-                  </div>
+                  {hasMore && (
+                    <div className="mt-8 text-center">
+                      <Button
+                        variant="outline"
+                        onClick={handleLoadMore}
+                        className="px-8"
+                        disabled={loadingMore}
+                      >
+                        {loadingMore ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin mr-2" />
+                            Laden...
+                          </>
+                        ) : (
+                          'Meer laden'
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </>
-              ) : (
-                <div 
+              )}
+
+              {/* Empty State */}
+              {!loading && !error && results.length === 0 && (
+                <div
                   className="bg-white rounded-lg border border-lightgray-800 p-8 text-center"
                   role="alert"
                 >
@@ -536,7 +386,7 @@ const SearchPage: React.FC = () => {
                   </div>
                   <h3 className="text-xl font-bold mb-2">Geen kandidaten gevonden</h3>
                   <p className="text-gray-600 mb-6">
-                    We konden geen kandidaten vinden die aan uw zoekcriteria voldoen. Probeer andere filters of zoektermen.
+                    Probeer andere zoektermen of filters om kandidaten te vinden.
                   </p>
                   <Button
                     variant="primary"
@@ -550,7 +400,7 @@ const SearchPage: React.FC = () => {
                         languages: [],
                         matchScore: 0,
                         remote: undefined,
-                        branch: []
+                        branch: [],
                       });
                     }}
                   >
@@ -562,6 +412,182 @@ const SearchPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Candidate Detail Modal */}
+      <AnimatePresence>
+        {selectedCandidate && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="candidate-modal-title"
+            onClick={() => setSelectedCandidate(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-turquoise-100 text-turquoise-700 flex items-center justify-center text-xl font-bold">
+                      {(selectedCandidate.summary || 'K').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h2 id="candidate-modal-title" className="text-2xl font-bold">
+                        Kandidaat #{selectedCandidate.id}
+                      </h2>
+                      {selectedCandidate.location && (
+                        <p className="text-gray-600 flex items-center mt-1">
+                          <MapPin size={16} className="mr-1" />
+                          {selectedCandidate.location}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedCandidate(null)}
+                    className="text-gray-500 hover:text-gray-700 p-1"
+                    aria-label="Sluit modal"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {/* Summary */}
+                {selectedCandidate.summary && (
+                  <div className="mb-6">
+                    <h3 className="font-bold mb-2">Samenvatting</h3>
+                    <p className="text-gray-600">{selectedCandidate.summary}</p>
+                  </div>
+                )}
+
+                {/* Contact & Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <h3 className="font-bold mb-3">Contactgegevens</h3>
+                    <div className="space-y-2">
+                      {selectedCandidate.phone && (
+                        <a
+                          href={`tel:${selectedCandidate.phone}`}
+                          className="flex items-center text-sm text-gray-600 hover:text-turquoise-600"
+                        >
+                          <Phone size={16} className="mr-2 text-gray-400" />
+                          {selectedCandidate.phone}
+                        </a>
+                      )}
+                      {selectedCandidate.availability && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Calendar size={16} className="mr-2 text-gray-400" />
+                          Beschikbaarheid: {selectedCandidate.availability}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold mb-3">Links</h3>
+                    <div className="space-y-2">
+                      {selectedCandidate.linkedin_url && (
+                        <a
+                          href={selectedCandidate.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+                        >
+                          <ExternalLink size={16} className="mr-2" />
+                          LinkedIn profiel
+                        </a>
+                      )}
+                      {selectedCandidate.github_url && (
+                        <a
+                          href={selectedCandidate.github_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+                        >
+                          <ExternalLink size={16} className="mr-2" />
+                          GitHub profiel
+                        </a>
+                      )}
+                      {selectedCandidate.kaggle_url && (
+                        <a
+                          href={selectedCandidate.kaggle_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center text-sm text-gray-600 hover:text-gray-800"
+                        >
+                          <ExternalLink size={16} className="mr-2" />
+                          Kaggle profiel
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Skills */}
+                {selectedCandidate.skills.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="font-bold mb-3">Vaardigheden</h3>
+                    <div className="space-y-2">
+                      {selectedCandidate.skills.map((skill) => (
+                        <div key={skill.id} className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{skill.skill_name}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-turquoise-500 rounded-full transition-all"
+                                style={{ width: `${(skill.level / 5) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-500 w-16">
+                              {getSkillLevel(skill.level)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Big Number (KvK) */}
+                {selectedCandidate.big_number && (
+                  <div className="mb-6">
+                    <h3 className="font-bold mb-2">BIG-nummer / KvK</h3>
+                    <p className="text-sm text-gray-600">{selectedCandidate.big_number}</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="border-t border-lightgray-800 pt-4 flex gap-3">
+                  <a
+                    href={`mailto:info@skillure.nl?subject=Contact%20kandidaat%20%23${selectedCandidate.id}`}
+                    className="flex-1"
+                  >
+                    <Button variant="primary" className="w-full" leftIcon={<Mail size={16} />}>
+                      Contact opnemen
+                    </Button>
+                  </a>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      toggleFavorite(selectedCandidate.id);
+                    }}
+                    leftIcon={<Star size={16} fill={favorites.includes(selectedCandidate.id) ? 'currentColor' : 'none'} />}
+                    className={favorites.includes(selectedCandidate.id) ? 'text-yellow-500 border-yellow-500' : ''}
+                  >
+                    {favorites.includes(selectedCandidate.id) ? 'Opgeslagen' : 'Opslaan'}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 };
